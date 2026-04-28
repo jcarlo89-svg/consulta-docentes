@@ -7,10 +7,17 @@ st.set_page_config(page_title="Legajo Docente ETI", layout="wide")
 
 # Función para convertir links de Drive a links directos de imagen
 def convertir_drive_url(url):
-    if 'drive.google.com' in url:
-        match = re.search(r'[-\w]{25,}', url)
-        if match:
-            return f"https://drive.google.com/uc?export=view&id={match.group()}"
+    if not url or pd.isna(url) or 'drive.google.com' not in str(url):
+        return "https://cdn-icons-png.flaticon.com/512/149/149071.png"
+    
+    # Extraer el ID del archivo sin importar el formato del link
+    id_match = re.search(r'/d/([-\w]{25,})', str(url)) or re.search(r'id=([-\w]{25,})', str(url))
+    
+    if id_match:
+        file_id = id_match.group(1)
+        # Usamos el dominio alternativo 'lh3.googleusercontent.com' que suele saltar bloqueos
+        return f"https://lh3.googleusercontent.com/u/0/d/{file_id}"
+    
     return url
 
 # Estilos CSS

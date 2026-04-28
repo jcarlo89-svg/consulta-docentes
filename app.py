@@ -6,18 +6,17 @@ import re
 # 1. Configuración de la página
 st.set_page_config(page_title="Legajo Docente ETI", layout="wide")
 
-# 2. Función de conversión de imagen mejorada (Solución definitiva para la foto)
+# 2. Función de conversión de imagen mejorada
 def convertir_drive_url(url):
     if not url or pd.isna(url) or 'drive.google.com' not in str(url):
         return "https://cdn-icons-png.flaticon.com/512/149/149071.png"
     
-    # Extraer el ID del archivo del enlace de Drive
     id_match = re.search(r'/d/([-\w]{25,})', str(url)) or re.search(r'id=([-\w]{25,})', str(url))
     
     if id_match:
         file_id = id_match.group(1)
-        # Usamos el servidor de contenido de Google que es más estable para incrustar imágenes
-        return f"https://lh3.googleusercontent.com/d/{file_id}"
+        # Formato estable para visualización
+        return f"https://drive.google.com/uc?export=view&id={file_id}"
     
     return url
 
@@ -35,7 +34,7 @@ st.markdown("""
     .docente-nombre { font-size: 22px; font-weight: bold; color: #1a1a1a; margin-bottom: 2px; }
     .header-label { font-size: 11px; color: #888; font-weight: bold; text-transform: uppercase; }
     .tag-especialidad { background-color: #004B98; color: white; padding: 6px 12px; border-radius: 5px; font-size: 12px; font-weight: bold; }
-    .contacto-tel { font-size: 14px; color: #25D366; font-weight: bold; margin-top: 8px; display: flex; align-items: center; gap: 5px; }
+    .contacto-tel { font-size: 15px; color: #25D366; font-weight: bold; margin-top: 8px; display: flex; align-items: center; gap: 5px; }
     .grado-item { margin-top: 15px; padding-bottom: 10px; border-bottom: 1px solid #eee; }
     .grado-titulo { color: #00B5E2; font-weight: bold; font-size: 15px; }
     .curso-box { background-color: #f8f9fa; padding: 12px; border-radius: 5px; border-left: 5px solid #00B5E2; margin-top: 10px; font-size: 13px; }
@@ -50,10 +49,10 @@ try:
     conn = st.connection("gsheets", type=GSheetsConnection)
     df = conn.read(ttl=0)
 except Exception as e:
-    st.error("Error de conexión. Revisa la configuración de Secrets.")
+    st.error("Error de conexión.")
     df = pd.DataFrame()
 
-# 5. Buscador e Interfaz
+# 5. Buscador
 busqueda = st.text_input("Ingrese DNI o Apellidos para consultar:")
 
 if busqueda and not df.empty:
@@ -64,14 +63,21 @@ if busqueda and not df.empty:
             dni_val = grupo['dni'].iloc[0] if 'dni' in grupo.columns else "N/A"
             especialidad = str(grupo['especialidad'].iloc[0]) if 'especialidad' in grupo.columns and pd.notna(grupo['especialidad'].iloc[0]) else "GENERAL"
             
-            # Validación de la columna 'numero'
+            # --- CORRECCIÓN DEL NÚMERO (FORMATO CIENTÍFICO) ---
             if 'numero' in grupo.columns:
                 val_tel = grupo['numero'].iloc[0]
-                telefono = str(val_tel) if pd.notna(val_tel) else "No registrado"
+                if pd.notna(val_tel):
+                    # Convertimos a float primero, luego a int para quitar el .0 y finalmente a string
+                    try:
+                        telefono = str(int(float(val_tel)))
+                    except:
+                        telefono = str(val_tel)
+                else:
+                    telefono = "No registrado"
             else:
-                telefono = "Columna 'numero' no encontrada"
+                telefono = "Sin columna 'numero'"
             
-            # Procesar foto con la nueva lógica
+            # Procesar foto
             raw_foto = str(grupo['foto'].iloc[0]) if 'foto' in grupo.columns and pd.notna(grupo['foto'].iloc[0]) else ""
             foto_url = convertir_drive_url(raw_foto)
             placeholder = "https://cdn-icons-png.flaticon.com/512/149/149071.png"
@@ -85,7 +91,7 @@ if busqueda and not df.empty:
                             <div class="header-label">Docente ETI</div>
                             <div class="docente-nombre">{nombre}</div>
                             <div class="header-label">ID: DNI {dni_val}</div>
-                            <div class="contacto-tel">📞 WhatsApp: {telefono}</div>
+                            <div class="contacto-tel">📲 WhatsApp: {telefono}</div>
                         </div>
                     </div>
                     <div style="text-align: right;">

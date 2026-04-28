@@ -4,78 +4,118 @@ from streamlit_gsheets import GSheetsConnection
 
 st.set_page_config(page_title="Legajo Docente ETI", layout="wide")
 
-# Estilo CSS para reducir tamaños y mejorar legibilidad
+# CSS para un diseño limpio, profesional y sin textos cortados
 st.markdown("""
     <style>
-    .reportview-container .main .block-container { padding-top: 1rem; }
-    .docente-container { 
-        border-bottom: 1px solid #e0e0e0; 
-        padding: 10px 0; 
-        font-size: 12px; /* Letra más pequeña general */
+    .main { background-color: #f8f9fa; }
+    .legajo-card {
+        background-color: white;
+        padding: 20px;
+        border-radius: 8px;
+        border: 1px solid #dee2e6;
+        margin-bottom: 25px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
-    .label-header { 
-        font-weight: bold; 
-        color: #333; 
-        font-size: 11px; 
-        text-transform: uppercase; 
-    }
-    .info-text { color: #555; margin-bottom: 5px; }
-    .titulo-celeste { 
-        color: #00B5E2; 
-        font-weight: bold; 
-        font-size: 13px; 
-        text-transform: uppercase; 
-    }
-    .badge-especialidad {
-        background-color: #f0f2f6;
-        padding: 2px 8px;
-        border-radius: 10px;
+    .header-label {
+        font-size: 11px;
+        color: #6c757d;
         font-weight: bold;
-        color: #004B98;
-        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 2px;
+    }
+    .data-text {
+        font-size: 14px;
+        color: #212529;
+        margin-bottom: 12px;
+        line-height: 1.4;
+    }
+    .grado-resaltado {
+        color: #00B5E2;
+        font-weight: bold;
+        font-size: 15px;
+        text-transform: uppercase;
+    }
+    .especialidad-tag {
+        display: inline-block;
+        background-color: #004B98;
+        color: white;
+        padding: 4px 12px;
+        border-radius: 4px;
+        font-weight: bold;
+        font-size: 12px;
+        margin-top: 5px;
+    }
+    .cursos-box {
+        background-color: #f1f3f5;
+        padding: 10px;
+        border-left: 4px solid #00B5E2;
+        font-size: 13px;
+        margin-top: 10px;
+        border-radius: 0 4px 4px 0;
     }
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🏛️ Legajo Docente ETI")
+st.title("🏛️ Sistema de Legajo Docente ETI")
 
 conn = st.connection("gsheets", type=GSheetsConnection)
 df = conn.read(ttl=0)
 
-busqueda = st.text_input("Buscar por DNI o Apellidos:")
+busqueda = st.text_input("Ingrese DNI o Apellidos para consultar:")
 
 if busqueda:
-    # Filtro flexible
-    res = df[(df['dni'].astype(str) == busqueda) | (df['nombre'].str.contains(busqueda, case=False, na=False))]
+    # Filtro de búsqueda
+    res = df[(df['dni'].astype(str).str.contains(busqueda)) | (df['nombre'].str.contains(busqueda, case=False, na=False))]
     
     if not res.empty:
-        for _, row in res.iterrows():
+        # Agrupamos por nombre para no repetir el bloque de "Datos del Docente"
+        for nombre, grupo in res.groupby('nombre'):
+            dni_docente = grupo['dni'].iloc[0]
+            # Tomamos la especialidad del primer registro encontrado
+            especialidad = grupo['especialidad'].iloc[0] if 'especialidad' in grupo.columns else "No especificada"
+            
             with st.container():
-                # Usamos columnas para distribuir el espacio
-                c1, c2, c3 = st.columns([1.2, 2, 1.5])
-                
-                with c1:
-                    st.markdown(f"<div class='label-header'>Graduado</div>", unsafe_allow_html=True)
-                    st.markdown(f"<div class='info-text'><b>{row['nombre']}</b><br>DNI {row['dni']}</div>", unsafe_allow_html=True)
-                    # Badge de especialidad
-                    st.markdown(f"<span class='badge-especialidad'>{row.get('especialidad', 'General')}</span>", unsafe_allow_html=True)
-
-                with c2:
-                    st.markdown(f"<div class='label-header'>Grado o Título</div>", unsafe_allow_html=True)
-                    st.markdown(f"<div class='titulo-celeste'>{row['grado']}</div>", unsafe_allow_html=True)
-                    st.markdown(f"<div class='info-text' style='font-size:10px;'>Año: {row['anio']}</div>", unsafe_allow_html=True)
+                st.markdown(f"""
+                <div class="legajo-card">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                        <div>
+                            <div class="header-label">Docente</div>
+                            <div class="data-text" style="font-size: 18px; font-weight: bold;">{nombre}</div>
+                            <div class="header-label">Identificación</div>
+                            <div class="data-text">DNI {dni_docente}</div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div class="header-label">Especialidad ETI</div>
+                            <div class="especialidad-tag">{especialidad}</div>
+                        </div>
+                    </div>
                     
-                    # Mostrar cursos si existen
-                    if 'cursos' in row and pd.notna(row['cursos']):
-                        st.markdown(f"<div class='label-header' style='margin-top:5px;'>Cursos Dictados</div>", unsafe_allow_html=True)
-                        st.markdown(f"<div style='font-size:11px; color:#666;'>{row['cursos']}</div>", unsafe_allow_html=True)
-
-                with c3:
-                    st.markdown(f"<div class='label-header'>Institución</div>", unsafe_allow_html=True)
-                    st.markdown(f"<div class='info-text'>{row['institucion']}</div>", unsafe_allow_html=True)
+                    <hr style="margin: 15px 0;">
+                    
+                    <div class="header-label">Historial de Grados y Títulos</div>
+                """, unsafe_allow_html=True)
                 
-                st.markdown("<hr style='margin:10px 0; opacity:0.3;'>", unsafe_allow_html=True)
-    else:
-        st.warning("No se encontraron registros.")
+                # Listamos cada grado en una línea independiente
+                for _, row in grupo.iterrows():
+                    st.markdown(f"""
+                        <div style="margin-bottom: 15px; padding-left: 10px; border-left: 2px solid #eee;">
+                            <div class="grado-resaltado">{row['grado']}</div>
+                            <div class="data-text" style="font-size: 13px;">{row['institucion']} | Año: {row['anio']}</div>
+                        </div>
+                    """, unsafe_allow_html=True)
 
-# --- PANEL ADMIN (Opcional mantenerlo igual) ---
+                # Columna independiente de cursos al final del legajo
+                if 'cursos_dictados' in grupo.columns:
+                    # Unimos todos los cursos mencionados en sus distintos grados si es necesario, 
+                    # o solo mostramos los del docente
+                    cursos = ", ".join(grupo['cursos_dictados'].dropna().unique())
+                    if cursos:
+                        st.markdown(f"""
+                            <div class="header-label">Cursos Dictados</div>
+                            <div class="cursos-box">{cursos}</div>
+                        """, unsafe_allow_html=True)
+                
+                st.markdown("</div>", unsafe_allow_html=True)
+    else:
+        st.error("No se encontraron registros para la búsqueda realizada.")

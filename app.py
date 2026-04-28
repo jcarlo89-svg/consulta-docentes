@@ -2,59 +2,80 @@ import streamlit as st
 import pandas as pd
 from streamlit_gsheets import GSheetsConnection
 
-# Configuración de la página
-st.set_page_config(page_title="Consulta de Grados", layout="wide")
+st.set_page_config(page_title="Legajo Docente ETI", layout="wide")
 
-st.title("🏛️ Sistema de Consulta Universitaria")
+# Estilo CSS para reducir tamaños y mejorar legibilidad
+st.markdown("""
+    <style>
+    .reportview-container .main .block-container { padding-top: 1rem; }
+    .docente-container { 
+        border-bottom: 1px solid #e0e0e0; 
+        padding: 10px 0; 
+        font-size: 12px; /* Letra más pequeña general */
+    }
+    .label-header { 
+        font-weight: bold; 
+        color: #333; 
+        font-size: 11px; 
+        text-transform: uppercase; 
+    }
+    .info-text { color: #555; margin-bottom: 5px; }
+    .titulo-celeste { 
+        color: #00B5E2; 
+        font-weight: bold; 
+        font-size: 13px; 
+        text-transform: uppercase; 
+    }
+    .badge-especialidad {
+        background-color: #f0f2f6;
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-weight: bold;
+        color: #004B98;
+        font-size: 10px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
-# Conexión a Google Sheets
-# Nota: La URL se configurará en el paso 3 en Streamlit Cloud
+st.title("🏛️ Legajo Docente ETI")
+
 conn = st.connection("gsheets", type=GSheetsConnection)
+df = conn.read(ttl=0)
 
-# Leer los datos
-try:
-    df = conn.read()
-except Exception as e:
-    st.error("Error al conectar con la base de datos. Verifica la configuración.")
-    df = pd.DataFrame()
+busqueda = st.text_input("Buscar por DNI o Apellidos:")
 
-# --- BUSCADOR ---
-busqueda = st.text_input("Ingrese DNI o Apellidos del docente:")
-
-if busqueda and not df.empty:
-    resultado = df[(df['dni'].astype(str) == busqueda) | (df['nombre'].str.contains(busqueda, case=False, na=False))]
+if busqueda:
+    # Filtro flexible
+    res = df[(df['dni'].astype(str) == busqueda) | (df['nombre'].str.contains(busqueda, case=False, na=False))]
     
-    if not resultado.empty:
-        for _, row in resultado.iterrows():
+    if not res.empty:
+        for _, row in res.iterrows():
             with st.container():
-                col1, col2, col3 = st.columns([1, 2, 1.5])
-                with col1:
-                    st.markdown(f"**GRADUADO**\n\n{row['nombre']}\n\nDNI {row['dni']}")
-                with col2:
-                    st.markdown(f"**GRADO O TÍTULO**\n\n<span style='color:#00B5E2; font-weight:bold;'>{row['grado']}</span>", unsafe_allow_html=True)
-                    st.caption(f"Año: {row['anio']}")
-                with col3:
-                    st.markdown(f"**INSTITUCIÓN**\n\n{row['institucion']}")
-                st.divider()
+                # Usamos columnas para distribuir el espacio
+                c1, c2, c3 = st.columns([1.2, 2, 1.5])
+                
+                with c1:
+                    st.markdown(f"<div class='label-header'>Graduado</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='info-text'><b>{row['nombre']}</b><br>DNI {row['dni']}</div>", unsafe_allow_html=True)
+                    # Badge de especialidad
+                    st.markdown(f"<span class='badge-especialidad'>{row.get('especialidad', 'General')}</span>", unsafe_allow_html=True)
+
+                with c2:
+                    st.markdown(f"<div class='label-header'>Grado o Título</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='titulo-celeste'>{row['grado']}</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='info-text' style='font-size:10px;'>Año: {row['anio']}</div>", unsafe_allow_html=True)
+                    
+                    # Mostrar cursos si existen
+                    if 'cursos' in row and pd.notna(row['cursos']):
+                        st.markdown(f"<div class='label-header' style='margin-top:5px;'>Cursos Dictados</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div style='font-size:11px; color:#666;'>{row['cursos']}</div>", unsafe_allow_html=True)
+
+                with c3:
+                    st.markdown(f"<div class='label-header'>Institución</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='info-text'>{row['institucion']}</div>", unsafe_allow_html=True)
+                
+                st.markdown("<hr style='margin:10px 0; opacity:0.3;'>", unsafe_allow_html=True)
     else:
         st.warning("No se encontraron registros.")
 
-# --- PANEL ADMIN PARA ALIMENTAR ---
-st.sidebar.title("Administración")
-if st.sidebar.text_input("Contraseña", type="password") == "admin123":
-    st.sidebar.success("Acceso concedido")
-    with st.sidebar.form("Añadir Registro"):
-        dni = st.text_input("DNI")
-        nombre = st.text_input("Nombre Completo")
-        grado = st.text_input("Grado")
-        inst = st.text_input("Institución")
-        anio = st.text_input("Año")
-        
-        if st.form_submit_button("Guardar en Google Sheets"):
-            # Crear nueva fila
-            nueva_fila = pd.DataFrame([[dni, nombre, grado, inst, anio]], columns=df.columns)
-            actualizado = pd.concat([df, nueva_fila], ignore_index=True)
-            # Guardar de vuelta en Google Sheets
-            conn.update(data=actualizado)
-            st.sidebar.success("¡Datos guardados permanentemente!")
-            st.rerun()
+# --- PANEL ADMIN (Opcional mantenerlo igual) ---

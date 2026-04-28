@@ -4,60 +4,67 @@ from streamlit_gsheets import GSheetsConnection
 
 st.set_page_config(page_title="Legajo Docente ETI", layout="wide")
 
-# CSS para un diseño limpio, profesional y sin textos cortados
+# CSS Profesional para evitar textos cortados y mejorar el orden
 st.markdown("""
     <style>
-    .main { background-color: #f8f9fa; }
-    .legajo-card {
+    .main { background-color: #f0f2f5; }
+    .card {
         background-color: white;
-        padding: 20px;
-        border-radius: 8px;
-        border: 1px solid #dee2e6;
-        margin-bottom: 25px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        padding: 25px;
+        border-radius: 10px;
+        border: 1px solid #d1d9e6;
+        margin-bottom: 20px;
     }
     .header-label {
         font-size: 11px;
-        color: #6c757d;
+        color: #888;
         font-weight: bold;
         text-transform: uppercase;
-        letter-spacing: 0.5px;
-        margin-bottom: 2px;
+        margin-bottom: 5px;
     }
-    .data-text {
-        font-size: 14px;
-        color: #212529;
-        margin-bottom: 12px;
-        line-height: 1.4;
-    }
-    .grado-resaltado {
-        color: #00B5E2;
+    .docente-nombre {
+        font-size: 22px;
         font-weight: bold;
-        font-size: 15px;
-        text-transform: uppercase;
+        color: #1a1a1a;
+        margin-bottom: 5px;
     }
-    .especialidad-tag {
-        display: inline-block;
+    .tag-especialidad {
         background-color: #004B98;
         color: white;
-        padding: 4px 12px;
-        border-radius: 4px;
+        padding: 6px 15px;
+        border-radius: 5px;
         font-weight: bold;
         font-size: 12px;
-        margin-top: 5px;
+        display: inline-block;
     }
-    .cursos-box {
-        background-color: #f1f3f5;
-        padding: 10px;
-        border-left: 4px solid #00B5E2;
+    .grado-item {
+        margin-top: 15px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #eee;
+    }
+    .grado-titulo {
+        color: #00B5E2;
+        font-weight: bold;
+        font-size: 16px;
+        text-transform: uppercase;
+    }
+    .grado-inst {
+        color: #444;
         font-size: 13px;
-        margin-top: 10px;
-        border-radius: 0 4px 4px 0;
+    }
+    .curso-box {
+        background-color: #e9ecef;
+        padding: 12px;
+        border-radius: 5px;
+        margin-top: 15px;
+        font-size: 13px;
+        color: #333;
+        border-left: 5px solid #00B5E2;
     }
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🏛️ Sistema de Legajo Docente ETI")
+st.title("🏛️ Legajo Docente ETI")
 
 conn = st.connection("gsheets", type=GSheetsConnection)
 df = conn.read(ttl=0)
@@ -69,53 +76,50 @@ if busqueda:
     res = df[(df['dni'].astype(str).str.contains(busqueda)) | (df['nombre'].str.contains(busqueda, case=False, na=False))]
     
     if not res.empty:
-        # Agrupamos por nombre para no repetir el bloque de "Datos del Docente"
+        # Agrupamos por docente para mostrar una sola ficha por persona
         for nombre, grupo in res.groupby('nombre'):
-            dni_docente = grupo['dni'].iloc[0]
-            # Tomamos la especialidad del primer registro encontrado
-            especialidad = grupo['especialidad'].iloc[0] if 'especialidad' in grupo.columns else "No especificada"
-            
-            with st.container():
+            dni_val = grupo['dni'].iloc[0]
+            # Obtenemos especialidad y cursos (asegurando que no digan "nan")
+            especialidad = str(grupo['especialidad'].iloc[0]) if 'especialidad' in grupo.columns and pd.notna(grupo['especialidad'].iloc[0]) else "No definida"
+            cursos = str(grupo['cursos_dictados'].iloc[0]) if 'cursos_dictados' in grupo.columns and pd.notna(grupo['cursos_dictados'].iloc[0]) else "Sin cursos registrados"
+
+            # Renderizado de la ficha del docente
+            st.markdown(f"""
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <div class="header-label">Docente ETI</div>
+                        <div class="docente-nombre">{nombre}</div>
+                        <div class="header-label">Identificación: <span style="color:#333">DNI {dni_val}</span></div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div class="header-label">Especialidad</div>
+                        <div class="tag-especialidad">{especialidad}</div>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 25px;">
+                    <div class="header-label">Historial Académico</div>
+            """, unsafe_allow_html=True)
+
+            # Bloque de Grados
+            for _, row in grupo.iterrows():
                 st.markdown(f"""
-                <div class="legajo-card">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                        <div>
-                            <div class="header-label">Docente</div>
-                            <div class="data-text" style="font-size: 18px; font-weight: bold;">{nombre}</div>
-                            <div class="header-label">Identificación</div>
-                            <div class="data-text">DNI {dni_docente}</div>
-                        </div>
-                        <div style="text-align: right;">
-                            <div class="header-label">Especialidad ETI</div>
-                            <div class="especialidad-tag">{especialidad}</div>
+                    <div class="grado-item">
+                        <div class="grado-titulo">{row['grado']}</div>
+                        <div class="grado-inst">{row['institucion']} | <b>Año: {row['anio']}</b></div>
+                    </div>
+                """, unsafe_allow_html=True)
+
+            # Bloque de Cursos
+            st.markdown(f"""
+                    <div style="margin-top: 20px;">
+                        <div class="header-label">Cursos Dictados</div>
+                        <div class="curso-box">
+                            {cursos}
                         </div>
                     </div>
-                    
-                    <hr style="margin: 15px 0;">
-                    
-                    <div class="header-label">Historial de Grados y Títulos</div>
-                """, unsafe_allow_html=True)
-                
-                # Listamos cada grado en una línea independiente
-                for _, row in grupo.iterrows():
-                    st.markdown(f"""
-                        <div style="margin-bottom: 15px; padding-left: 10px; border-left: 2px solid #eee;">
-                            <div class="grado-resaltado">{row['grado']}</div>
-                            <div class="data-text" style="font-size: 13px;">{row['institucion']} | Año: {row['anio']}</div>
-                        </div>
-                    """, unsafe_allow_html=True)
-
-                # Columna independiente de cursos al final del legajo
-                if 'cursos_dictados' in grupo.columns:
-                    # Unimos todos los cursos mencionados en sus distintos grados si es necesario, 
-                    # o solo mostramos los del docente
-                    cursos = ", ".join(grupo['cursos_dictados'].dropna().unique())
-                    if cursos:
-                        st.markdown(f"""
-                            <div class="header-label">Cursos Dictados</div>
-                            <div class="cursos-box">{cursos}</div>
-                        """, unsafe_allow_html=True)
-                
-                st.markdown("</div>", unsafe_allow_html=True)
+                </div>
+            """, unsafe_allow_html=True)
     else:
-        st.error("No se encontraron registros para la búsqueda realizada.")
+        st.error("No se encontraron resultados.")
